@@ -1,0 +1,135 @@
+//tile layers
+
+//default map
+var defaultMap = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+	maxZoom: 19,
+	attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+});
+
+//grayscale
+var grayscale = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.{ext}', {
+	attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+	subdomains: 'abcd',
+	minZoom: 0,
+	maxZoom: 20,
+	ext: 'png'
+});
+
+//terrain
+var terrain = L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}', {
+	maxZoom: 20,
+	attribution: 'Tiles courtesy of the <a href="https://usgs.gov/">U.S. Geological Survey</a>'
+});
+
+//watercolor
+var watercolor = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.{ext}', {
+	attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+	subdomains: 'abcd',
+	minZoom: 1,
+	maxZoom: 16,
+	ext: 'jpg'
+});
+
+
+
+
+
+
+let basemaps = {
+    Default: defaultMap,
+    Grayscale: grayscale,
+    Terrain: terrain,
+    Watercolor: watercolor
+};
+
+//map object
+var myMap = L.map("map", {
+    center: [36.7783, -119.4179],
+    zoom: 3,
+    layers: [defaultMap, grayscale, terrain, watercolor]
+});
+
+//add default map
+defaultMap.addTo(myMap);
+
+
+
+
+//tectonic plates
+let tectonicplates = new L.layerGroup();
+//call plates api
+d3.json("https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json")
+.then(function(plateData){
+    L.geoJson(plateData,{
+        color: "red",
+        weight: 1
+    }).addTo(tectonicplates);
+});
+
+//add plates layer
+tectonicplates.addTo(myMap);
+
+
+//create earthquake layer
+let earthquakes = new L.layerGroup();
+//call earthquake api
+d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson")
+.then(
+    //color of circles
+    function(earthquakeData){
+        function dataColor(depth){
+            if (depth > 90)
+                return "red";
+            else if(depth > 70)
+                return "#fc4903";
+            else if(depth > 50)
+                return "#fc8403";
+            else if(depth > 30)
+                return "#cafc03";
+            else if(depth > 10)
+                return "green";
+        }
+        //size of circles
+        function radiusSize(mag){
+            if (mag == 0)
+                return 1; //shows 0 mag
+            else
+                return mag * 5; //makes circle bigger
+        }
+
+        //style for circles
+        function dataStyle(feature)
+        {
+            return {
+                opacity: 1,
+                fillOpacity: 1,
+                fillColor: dataColor(feature.geometry.coordinates[2]),
+                color: "black",
+                radius: radiusSize(feature.properties.mag),
+                weight: 0.5
+            }
+        }
+
+        //add data to earthquake layer
+        L.geoJson(earthquakeData, {
+            pointToLayer: function(feature, latLng) {
+                return L.circleMarker(latLng);
+            },
+            style: dataStyle,
+
+        }).addTo(earthquakes);
+    }  
+);
+
+earthquakes.addTo(myMap);
+
+
+//create overlays
+let overlays = {
+    "Tectonic Plates": tectonicplates,
+    "Earth Quakes": earthquakes
+};
+
+L.control
+    .layers(basemaps, overlays)
+    .addTo(myMap);
